@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#090d16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Track your Austrian KlimaTicket savings, calculate break-even date, and count pure profit effortlessly.">
+  <title>KlimaTracker — KlimaTicket Savings & Break-Even</title>
+
+  <!-- Tailwind CSS & Inter Font -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <!-- Canvas Confetti Library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+            },
+            surface: {
+              base: '#090d16',
+              card: '#111827',
+              sheet: '#161f33',
+              border: '#1f293d',
+              highlight: '#25324b'
+            }
+          },
+          boxShadow: {
+            'glow-emerald': '0 0 35px -5px rgba(16, 185, 129, 0.35)',
+            'glow-cyan': '0 0 30px -5px rgba(6, 182, 212, 0.35)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scrollbars & smooth transitions */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      touch-action: manipulation;
+    }
+    input, textarea {
+      user-select: text;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #1f293d;
+      border-radius: 4px;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.35; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(1.04); }
+    }
+    .animate-glow {
+      animation: pulseGlow 4s ease-in-out infinite;
+    }
+    .tap-scale {
+      transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .tap-scale:active {
+      transform: scale(0.96);
+    }
+    .circle-progress {
+      transition: stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+  </style>
+</head>
+<body class="bg-surface-base text-slate-100 font-sans min-h-screen flex flex-col justify-between antialiased selection:bg-brand-500 selection:text-white">
+
+  <header class="sticky top-0 z-30 bg-surface-base/80 backdrop-blur-lg border-b border-surface-border px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
+        <!-- Ticket Icon -->
+        <svg class="w-5 h-5 text-surface-base" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+          <path d="M4 4h16a2 2 0 0 1 2 2v2a2 2 0 0 0-2 2 2 2 0 0 0 2 2v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2a2 2 0 0 0 2-2 2 2 0 0 0-2-2V6a2 2 0 0 1 2-2z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base font-bold tracking-tight text-white leading-tight">KlimaTracker</h1>
+        <p class="text-[11px] text-emerald-400 font-medium tracking-wide flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+          Graz & Austria Transit
+        </p>
+      </div>
+    </div>
+
+    <!-- Header Actions: Share & Settings -->
+    <div class="flex items-center space-x-1.5">
+      <button id="btnShareApp" class="w-9 h-9 rounded-xl bg-surface-card border border-surface-border text-slate-300 flex items-center justify-center tap-scale hover:text-white" title="Share with friends">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+        </svg>
+      </button>
+      <button id="btnOpenSettings" class="w-9 h-9 rounded-xl bg-surface-card border border-surface-border text-slate-300 flex items-center justify-center tap-scale hover:text-white" title="Settings & Goals">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-md mx-auto px-4 pb-28 pt-4 space-y-5 overflow-y-auto custom-scroll">
+    
+    <div class="relative bg-gradient-to-b from-surface-card to-surface-card/70 border border-surface-border rounded-3xl p-5 shadow-xl overflow-hidden">
+      <!-- Glow ambient background -->
+      <div id="heroGlow" class="absolute -top-16 -right-16 w-44 h-44 bg-brand-500/20 rounded-full blur-3xl pointer-events-none animate-glow"></div>
+      
+      <div class="flex items-center justify-between">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Saved</span>
+          <div class="flex items-baseline space-x-1 mt-0.5">
+            <span class="text-4xl font-black tracking-tight text-white font-mono" id="totalSavedDisplay">€0.00</span>
+          </div>
+        </div>
+
+        <!-- Radial Gauge -->
+        <div class="relative flex items-center justify-center">
+          <svg class="w-24 h-24 transform -rotate-90" viewBox="0 0 100 100">
+            <!-- Background circle -->
+            <circle cx="50" cy="50" r="40" stroke="#1f293d" stroke-width="8" fill="transparent" />
+            <!-- Progress meter -->
+            <circle id="radialProgressBar" class="circle-progress text-brand-500" cx="50" cy="50" r="40" stroke="currentColor" stroke-width="8" stroke-linecap="round" fill="transparent" stroke-dasharray="251.2" stroke-dashoffset="251.2" />
+          </svg>
+          <div class="absolute flex flex-col items-center justify-center text-center">
+            <span id="percentDisplay" class="text-base font-extrabold font-mono text-white leading-none">0%</span>
+            <span class="text-[9px] uppercase font-bold text-slate-400 tracking-wider mt-0.5">Target</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dynamic Status Pill -->
+      <div id="statusBadge" class="mt-4 py-2 px-3.5 rounded-2xl bg-surface-sheet/90 border border-surface-border flex items-center justify-between text-xs transition-all">
+        <div class="flex items-center space-x-2 truncate">
+          <span id="statusIcon" class="text-brand-400 text-sm">🎯</span>
+          <span id="statusText" class="font-medium text-slate-200 truncate">€324.00 remaining to break even</span>
+        </div>
+        <span id="targetSubtext" class="text-[11px] font-mono text-slate-400 ml-2 whitespace-nowrap">Goal: €324</span>
+      </div>
+
+      <!-- Fast Undo Mini Button (Only appears if ride exists) -->
+      <div id="quickUndoContainer" class="hidden mt-3 pt-3 border-t border-surface-border/60 flex items-center justify-between text-xs">
+        <span class="text-slate-400 text-[11px]">Last added: <span id="lastAddedDesc" class="font-semibold text-slate-200">+€3.30</span></span>
+        <button id="btnQuickUndo" class="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 tap-scale py-0.5 px-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+          Undo
+        </button>
+      </div>
+    </div>
+
+    <div class="space-y-2.5">
+      <div class="flex items-center justify-between px-1">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Log A Ride</h2>
+        <span class="text-[11px] text-slate-500 font-medium">1-Tap Fast Entry</span>
+      </div>
+
+      <!-- Primary Action: Graz Zone 101 single ticket (+3.30€) -->
+      <button id="btnPrimaryAdd" class="relative group w-full py-4 px-5 rounded-2xl bg-gradient-to-r from-brand-600 via-brand-500 to-emerald-400 text-surface-base font-bold text-lg shadow-lg shadow-brand-500/25 tap-scale flex items-center justify-between border border-emerald-300/40 active:brightness-95">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-surface-base/20 flex items-center justify-center text-xl">
+            🚊
+          </div>
+          <div class="text-left">
+            <div class="text-surface-base font-extrabold text-base leading-tight">1 Single Ride</div>
+            <div class="text-[11px] text-emerald-950/80 font-medium">Zone 101 / Urban Core</div>
+          </div>
+        </div>
+        <div class="flex items-center space-x-1.5 bg-surface-base/20 py-1.5 px-3 rounded-xl backdrop-blur-sm">
+          <span class="text-lg font-black font-mono">+€3.30</span>
+        </div>
+      </button>
+
+      <!-- Secondary Preset Fare Chips -->
+      <div class="grid grid-cols-3 gap-2">
+        <button data-amount="6.70" data-label="24h Ticket" class="preset-btn py-2.5 px-2 rounded-2xl bg-surface-card border border-surface-border hover:border-slate-600 flex flex-col items-center justify-center tap-scale">
+          <span class="text-[11px] font-semibold text-slate-400">24h Ticket</span>
+          <span class="text-sm font-bold text-white font-mono mt-0.5">+€6.70</span>
+        </button>
+
+        <button data-amount="6.00" data-label="Regional Train" class="preset-btn py-2.5 px-2 rounded-2xl bg-surface-card border border-surface-border hover:border-slate-600 flex flex-col items-center justify-center tap-scale">
+          <span class="text-[11px] font-semibold text-slate-400">Regional</span>
+          <span class="text-sm font-bold text-white font-mono mt-0.5">+€6.00</span>
+        </button>
+
+        <button data-amount="1.70" data-label="Hourly / Subsidized" class="preset-btn py-2.5 px-2 rounded-2xl bg-surface-card border border-surface-border hover:border-slate-600 flex flex-col items-center justify-center tap-scale">
+          <span class="text-[11px] font-semibold text-slate-400">Reduced</span>
+          <span class="text-sm font-bold text-white font-mono mt-0.5">+€1.70</span>
+        </button>
+      </div>
+
+      <!-- Custom Amount Launcher -->
+      <button id="btnOpenCustomModal" class="w-full py-2.5 px-4 rounded-2xl bg-surface-sheet border border-dashed border-surface-border hover:border-brand-500/60 text-slate-300 hover:text-white text-xs font-semibold flex items-center justify-center space-x-2 tap-scale">
+        <svg class="w-4 h-4 text-brand-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        <span>Custom Fare & Long Distance (e.g. Vienna Train)</span>
+      </button>
+    </div>
+
+    <div class="bg-surface-card border border-surface-border rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Milestones</span>
+        <span id="milestoneCurrentLevel" class="text-[11px] font-bold text-brand-400">0 / 5 Unlocked</span>
+      </div>
+      <div class="grid grid-cols-5 gap-1.5 text-center" id="milestonesGrid">
+        <!-- Will be filled by JavaScript -->
+      </div>
+    </div>
+
+    <div class="bg-surface-card border border-surface-border rounded-2xl p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Smart Statistics</h3>
+        <span class="text-[11px] text-slate-500 font-mono" id="statsTotalRidesCount">0 rides total</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2.5">
+        <div class="p-3 bg-surface-sheet rounded-xl border border-surface-border">
+          <div class="text-[11px] text-slate-400 font-medium">This Week</div>
+          <div class="text-lg font-bold text-white font-mono mt-0.5" id="statsThisWeek">€0.00</div>
+          <div class="text-[10px] text-slate-500 mt-0.5" id="statsWeekRides">0 trips</div>
+        </div>
+        <div class="p-3 bg-surface-sheet rounded-xl border border-surface-border">
+          <div class="text-[11px] text-slate-400 font-medium">This Month</div>
+          <div class="text-lg font-bold text-white font-mono mt-0.5" id="statsThisMonth">€0.00</div>
+          <div class="text-[10px] text-slate-500 mt-0.5" id="statsMonthRides">0 trips</div>
+        </div>
+      </div>
+
+      <!-- Pace & Forecast -->
+      <div class="p-3 bg-gradient-to-r from-emerald-950/30 to-surface-sheet rounded-xl border border-brand-500/20 flex items-center justify-between">
+        <div>
+          <div class="text-[11px] text-brand-400 font-semibold uppercase tracking-wider">Break-Even Pace</div>
+          <div class="text-xs text-slate-300 mt-0.5" id="statsForecastText">Log more rides to calculate pace</div>
+        </div>
+        <div class="text-right font-mono text-sm font-bold text-white" id="statsAvgPerRide">€0.00 <span class="text-[10px] text-slate-400 block font-sans">avg / ride</span></div>
+      </div>
+
+      <!-- Visual Weekly Mini Bar Chart -->
+      <div>
+        <div class="text-[10px] font-bold uppercase text-slate-500 mb-2">Past 7 Days Activity</div>
+        <div class="h-16 flex items-end justify-between gap-1.5 px-1" id="weeklyMiniChart">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-3">
+      <div class="flex items-center justify-between px-1">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Ride History</h3>
+        <button id="btnClearAll" class="text-[11px] text-red-400 hover:text-red-300 font-medium tap-scale">Clear All</button>
+      </div>
+
+      <div id="historyListContainer" class="space-y-2">
+        <!-- Rendered ride items will go here -->
+      </div>
+    </div>
+
+  </main>
+
+  <div id="customModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity">
+    <div class="w-full max-w-sm bg-surface-sheet border-t sm:border border-surface-border rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 animate-in slide-in-from-bottom duration-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">Add Custom Fare</h3>
+        <button id="btnCloseCustomModal" class="w-8 h-8 rounded-full bg-surface-card text-slate-400 flex items-center justify-center">✕</button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Ticket Cost (€)</label>
+          <div class="relative">
+            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold font-mono text-lg">€</span>
+            <input id="customPriceInput" type="number" step="0.10" min="0.10" placeholder="12.50" class="w-full pl-9 pr-4 py-3 bg-surface-card border border-surface-border rounded-xl text-white font-mono text-xl font-bold focus:outline-none focus:border-brand-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Trip Name / Note (Optional)</label>
+          <input id="customNoteInput" type="text" maxlength="35" placeholder="e.g. Graz - Vienna Railjet" class="w-full px-3.5 py-2.5 bg-surface-card border border-surface-border rounded-xl text-white text-sm focus:outline-none focus:border-brand-500">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-2">
+        <button id="btnCancelCustom" class="py-3 rounded-xl bg-surface-card text-slate-300 font-semibold text-sm tap-scale">Cancel</button>
+        <button id="btnSubmitCustom" class="py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-surface-base font-bold text-sm tap-scale shadow-lg shadow-brand-500/20">Add Saving</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="w-full max-w-sm bg-surface-sheet border-t sm:border border-surface-border rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">Settings & Data</h3>
+        <button id="btnCloseSettings" class="w-8 h-8 rounded-full bg-surface-card text-slate-400 flex items-center justify-center">✕</button>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Target Price Setting -->
+        <div class="p-3.5 bg-surface-card border border-surface-border rounded-xl space-y-2">
+          <div class="flex justify-between items-center">
+            <label class="text-xs font-semibold text-slate-300">Ticket Break-Even Target</label>
+            <span class="text-[10px] text-brand-400 font-medium">Default Graz: €324</span>
+          </div>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold font-mono">€</span>
+            <input id="settingsTargetInput" type="number" step="1" min="1" class="w-full pl-8 pr-3 py-2 bg-surface-sheet border border-surface-border rounded-lg text-white font-mono font-bold focus:outline-none focus:border-brand-500">
+          </div>
+          <button id="btnSaveTarget" class="w-full py-2 bg-surface-highlight hover:bg-slate-700 text-xs font-semibold rounded-lg text-white transition">Update Goal</button>
+        </div>
+
+        <!-- Export & Backup -->
+        <div class="p-3.5 bg-surface-card border border-surface-border rounded-xl space-y-2">
+          <div class="text-xs font-semibold text-slate-300">Backup & Portability</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnExportData" class="py-2 px-3 bg-surface-highlight hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-200">Export JSON</button>
+            <label class="py-2 px-3 bg-surface-highlight hover:bg-slate-700 text-xs font-semibold rounded-lg text-slate-200 text-center cursor-pointer">
+              Import JSON
+              <input type="file" id="fileImportInput" accept=".json" class="hidden">
+            </label>
+          </div>
+        </div>
+
+        <!-- Info / Add to Homescreen notice -->
+        <div class="p-3 bg-emerald-950/20 border border-brand-500/20 rounded-xl text-[11px] text-slate-300 space-y-1">
+          <div class="font-bold text-emerald-400 flex items-center gap-1">
+            <span>📱 Install on Android</span>
+          </div>
+          <p>Tap your Chrome menu (<strong>⋮</strong>) and tap <strong>"Add to Home screen"</strong> or <strong>"Install app"</strong> to enjoy the native full-screen experience with no fees!</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="celebrationModal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-gradient-to-b from-surface-card to-surface-sheet border-2 border-brand-500/40 rounded-3xl p-6 shadow-2xl text-center space-y-4">
+      <div class="w-16 h-16 mx-auto rounded-2xl bg-brand-500/20 border border-brand-400 flex items-center justify-center text-3xl animate-bounce">
+        🏆
+      </div>
+      <div>
+        <span class="text-xs uppercase font-extrabold tracking-widest text-brand-400">Milestone Reached!</span>
+        <h2 id="celebrationTitle" class="text-2xl font-black text-white mt-1">Ticket Paid Off!</h2>
+        <p id="celebrationSubtext" class="text-xs text-slate-300 mt-2 leading-relaxed">
+          Your KlimaTicket has covered its entire €324.00 cost! Every ride from now on is 100% free pure profit!
+        </p>
+      </div>
+
+      <div class="p-3 bg-surface-card border border-surface-border rounded-xl">
+        <span class="text-[10px] uppercase font-bold text-slate-400">Total Logged Savings</span>
+        <div id="celebrationAmount" class="text-2xl font-black font-mono text-brand-400 mt-0.5">€324.00</div>
+      </div>
+
+      <div class="space-y-2 pt-2">
+        <button id="btnShareCelebration" class="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-surface-base font-extrabold text-sm tap-scale shadow-lg shadow-brand-500/30 flex items-center justify-center gap-2">
+          <span>🎉 Share Milestone</span>
+        </button>
+        <button id="btnCloseCelebration" class="w-full py-2.5 rounded-xl bg-surface-highlight text-slate-300 text-xs font-semibold tap-scale">
+          Keep Riding & Saving
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-surface-sheet border border-surface-border shadow-2xl rounded-2xl py-2.5 px-4 flex items-center space-x-3 transition-all duration-300 opacity-0 pointer-events-none translate-y-3">
+    <span id="toastIcon" class="text-base">✓</span>
+    <span id="toastMsg" class="text-xs font-semibold text-slate-100">Ride logged</span>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'klimatracker_v1_data';
+    const SETTINGS_KEY = 'klimatracker_v1_settings';
+
+    const DEFAULT_SETTINGS = {
+      targetPrice: 324.00,
+      soundEnabled: true,
+      hapticEnabled: true,
+      hasCelebrated100: false
+    };
+
+    // State container
+    let state = {
+      rides: [], // { id, amount, note, timestamp }
+      settings: { ...DEFAULT_SETTINGS }
+    };
+
+    let lastDeletedRide = null;
+
+    function playBeep(freq = 600, duration = 0.08, type = 'sine') {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        // Audio might be blocked until user gesture, safe to ignore
+      }
+    }
+
+    function triggerHaptic(type = 'light') {
+      if (!navigator.vibrate) return;
+      if (type === 'light') navigator.vibrate(15);
+      else if (type === 'success') navigator.vibrate([25, 40, 35]);
+      else if (type === 'celebration') navigator.vibrate([40, 60, 40, 60, 100]);
+    }
+
+    function loadFromStorage() {
+      try {
+        const storedData = localStorage.getItem(STORAGE_KEY);
+        if (storedData) {
+          state.rides = JSON.parse(storedData);
+        }
+        const storedSettings = localStorage.getItem(SETTINGS_KEY);
+        if (storedSettings) {
+          state.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) };
+        }
+      } catch (err) {
+        console.error('Failed to parse localStorage data:', err);
+      }
+    }
+
+    function saveToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.rides));
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+      } catch (err) {
+        console.error('Failed to save to localStorage:', err);
+      }
+    }
+
+    function formatCurrency(val) {
+      return '€' + Number(val).toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatTimeAgo(timestamp) {
+      const now = Date.now();
+      const diffSec = Math.floor((now - timestamp) / 1000);
+      if (diffSec < 60) return 'Just now';
+      if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+      
+      const date = new Date(timestamp);
+      const isToday = new Date().toDateString() === date.toDateString();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const mins = String(date.getMinutes()).padStart(2, '0');
+
+      if (isToday) return `Today, ${hours}:${mins}`;
+      
+      const isYesterday = new Date(Date.now() - 86400000).toDateString() === date.toDateString();
+      if (isYesterday) return `Yesterday, ${hours}:${mins}`;
+
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      return `${day}.${month}, ${hours}:${mins}`;
+    }
+
+    let toastTimeout = null;
+    function showToast(msg, icon = '✓') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.textContent = msg;
+      toastIcon.textContent = icon;
+
+      toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-3');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-3');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 2500);
+    }
+
+    function computeMetrics() {
+      const total = state.rides.reduce((acc, r) => acc + Number(r.amount), 0);
+      const target = Number(state.settings.targetPrice) || 324;
+      const count = state.rides.length;
+      const percent = target > 0 ? (total / target) * 100 : 0;
+      const remaining = Math.max(0, target - total);
+      const profit = Math.max(0, total - target);
+
+      // Calculations for This Week and This Month
+      const now = new Date();
+      const startOfWeek = new Date(now);
+      const day = (now.getDay() + 6) % 7; // Monday = 0
+      startOfWeek.setDate(now.getDate() - day);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      let thisWeekSum = 0;
+      let thisWeekCount = 0;
+      let thisMonthSum = 0;
+      let thisMonthCount = 0;
+
+      state.rides.forEach(r => {
+        const t = new Date(r.timestamp);
+        if (t >= startOfWeek) {
+          thisWeekSum += Number(r.amount);
+          thisWeekCount++;
+        }
+        if (t >= startOfMonth) {
+          thisMonthSum += Number(r.amount);
+          thisMonthCount++;
+        }
+      });
+
+      return {
+        total,
+        target,
+        count,
+        percent,
+        remaining,
+        profit,
+        thisWeekSum,
+        thisWeekCount,
+        thisMonthSum,
+        thisMonthCount,
+        avgPerRide: count > 0 ? total / count : 0
+      };
+    }
+
+    function renderDashboard() {
+      const m = computeMetrics();
+
+      // Total display
+      document.getElementById('totalSavedDisplay').textContent = formatCurrency(m.total);
+
+      // Radial Ring: Circumference = 2 * PI * 40 = ~251.2
+      const circumference = 251.2;
+      const ring = document.getElementById('radialProgressBar');
+      const clampedPercent = Math.min(100, Math.max(0, m.percent));
+      const strokeOffset = circumference - (clampedPercent / 100) * circumference;
+      ring.style.strokeDashoffset = strokeOffset;
+
+      // Ring percentage text
+      const percentDisplay = document.getElementById('percentDisplay');
+      percentDisplay.textContent = Math.round(m.percent) + '%';
+
+      // Status pill update
+      const statusIcon = document.getElementById('statusIcon');
+      const statusText = document.getElementById('statusText');
+      const statusBadge = document.getElementById('statusBadge');
+      const targetSubtext = document.getElementById('targetSubtext');
+
+      targetSubtext.textContent = `Goal: €${m.target.toFixed(0)}`;
+
+      if (m.total >= m.target) {
+        statusIcon.textContent = '🎉';
+        statusText.innerHTML = `Break-even reached! <strong class="text-brand-400 font-mono">+${formatCurrency(m.profit)}</strong> profit`;
+        statusBadge.className = 'mt-4 py-2 px-3.5 rounded-2xl bg-emerald-950/40 border border-brand-500/40 flex items-center justify-between text-xs transition-all';
+        ring.classList.add('text-brand-400');
+      } else {
+        statusIcon.textContent = '🎯';
+        statusText.textContent = `${formatCurrency(m.remaining)} remaining until break even`;
+        statusBadge.className = 'mt-4 py-2 px-3.5 rounded-2xl bg-surface-sheet/90 border border-surface-border flex items-center justify-between text-xs transition-all';
+      }
+
+      // Quick Undo visibility
+      const undoContainer = document.getElementById('quickUndoContainer');
+      const lastAddedDesc = document.getElementById('lastAddedDesc');
+      if (state.rides.length > 0) {
+        undoContainer.classList.remove('hidden');
+        const last = state.rides[0];
+        lastAddedDesc.textContent = `+${formatCurrency(last.amount)} (${last.note || 'Ride'})`;
+      } else {
+        undoContainer.classList.add('hidden');
+      }
+
+      renderMilestones(m.percent);
+      renderStatistics(m);
+      renderHistory();
+      renderWeeklyChart();
+    }
+
+    const MILESTONES = [
+      { pct: 25, label: '25%', name: 'Started' },
+      { pct: 50, label: '50%', name: 'Halfway' },
+      { pct: 75, label: '75%', name: 'Almost' },
+      { pct: 100, label: '100%', name: 'Break Even' },
+      { pct: 200, label: '200%', name: 'Double' },
+    ];
+
+    function renderMilestones(currentPercent) {
+      const container = document.getElementById('milestonesGrid');
+      let unlockedCount = 0;
+
+      container.innerHTML = MILESTONES.map(item => {
+        const isUnlocked = currentPercent >= item.pct;
+        if (isUnlocked) unlockedCount++;
+
+        return `
+          <div class="flex flex-col items-center p-2 rounded-xl border ${isUnlocked ? 'bg-brand-500/10 border-brand-500/30 text-brand-300' : 'bg-surface-sheet/50 border-surface-border text-slate-600'} transition-all">
+            <span class="text-xs font-mono font-black ${isUnlocked ? 'text-brand-400' : 'text-slate-500'}">${item.label}</span>
+            <span class="text-[9px] font-semibold tracking-tight mt-0.5 truncate w-full">${item.name}</span>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('milestoneCurrentLevel').textContent = `${unlockedCount} / ${MILESTONES.length} Unlocked`;
+    }
+
+    function renderStatistics(m) {
+      document.getElementById('statsTotalRidesCount').textContent = `${m.count} ${m.count === 1 ? 'ride' : 'rides'} total`;
+      document.getElementById('statsThisWeek').textContent = formatCurrency(m.thisWeekSum);
+      document.getElementById('statsWeekRides').textContent = `${m.thisWeekCount} rides this week`;
+      document.getElementById('statsThisMonth').textContent = formatCurrency(m.thisMonthSum);
+      document.getElementById('statsMonthRides').textContent = `${m.thisMonthCount} rides this month`;
+      document.getElementById('statsAvgPerRide').innerHTML = `${formatCurrency(m.avgPerRide)} <span class="text-[10px] text-slate-400 block font-sans">avg / ride</span>`;
+
+      // Break-even Pace Estimator
+      const forecastEl = document.getElementById('statsForecastText');
+      if (m.total >= m.target) {
+        forecastEl.innerHTML = `<span class="text-brand-400 font-bold">Goal achieved!</span> Saving 100% free money now.`;
+      } else if (m.thisWeekSum > 0) {
+        const weeklyRate = m.thisWeekSum;
+        const weeksLeft = m.remaining / weeklyRate;
+        const daysLeft = Math.ceil(weeksLeft * 7);
+        forecastEl.textContent = `At this week's pace: ~${daysLeft} days to break even!`;
+      } else if (state.rides.length > 2) {
+        const firstRideTime = state.rides[state.rides.length - 1].timestamp;
+        const daysActive = Math.max(1, (Date.now() - firstRideTime) / (1000 * 60 * 60 * 24));
+        const dailyRate = m.total / daysActive;
+        const daysLeft = Math.ceil(m.remaining / dailyRate);
+        forecastEl.textContent = `Estimated break-even in ~${daysLeft} days`;
+      } else {
+        forecastEl.textContent = `Log a few more rides to calculate pace`;
+      }
+    }
+
+    function renderWeeklyChart() {
+      const container = document.getElementById('weeklyMiniChart');
+      const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+      const past7 = [];
+      const today = new Date();
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(today.getDate() - i);
+        d.setHours(0, 0, 0, 0);
+        past7.push({
+          date: d,
+          dayLabel: days[d.getDay()],
+          sum: 0
+        });
+      }
+
+      state.rides.forEach(r => {
+        const rDate = new Date(r.timestamp);
+        rDate.setHours(0, 0, 0, 0);
+        const match = past7.find(p => p.date.getTime() === rDate.getTime());
+        if (match) {
+          match.sum += Number(r.amount);
+        }
+      });
+
+      const maxVal = Math.max(...past7.map(p => p.sum), 10);
+
+      container.innerHTML = past7.map((item, idx) => {
+        const heightPct = Math.max(12, Math.round((item.sum / maxVal) * 100));
+        const isToday = idx === 6;
+        return `
+          <div class="flex-1 flex flex-col items-center h-full justify-end group">
+            <div class="text-[9px] font-mono text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity mb-1">€${item.sum.toFixed(1)}</div>
+            <div class="w-full rounded-t-md transition-all ${isToday ? 'bg-brand-400 shadow-sm shadow-brand-500/50' : item.sum > 0 ? 'bg-brand-600/70' : 'bg-surface-sheet'}" style="height: ${heightPct}%;"></div>
+            <span class="text-[9px] font-bold ${isToday ? 'text-brand-400' : 'text-slate-500'} mt-1">${item.dayLabel}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyListContainer');
+      if (state.rides.length === 0) {
+        container.innerHTML = `
+          <div class="py-8 text-center bg-surface-card/60 rounded-2xl border border-surface-border">
+            <div class="text-3xl mb-1">🎫</div>
+            <p class="text-xs text-slate-400 font-medium">No rides logged yet</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Tap +€3.30 above every time you hop on transit!</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = state.rides.map(ride => `
+        <div class="flex items-center justify-between p-3 bg-surface-card rounded-2xl border border-surface-border hover:border-slate-700 transition">
+          <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-xl bg-surface-sheet flex items-center justify-center text-brand-400 text-sm font-bold">
+              +
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">${ride.note || 'Public Transit Ride'}</div>
+              <div class="text-[10px] text-slate-400">${formatTimeAgo(ride.timestamp)}</div>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span class="text-sm font-black font-mono text-brand-400">+${formatCurrency(ride.amount)}</span>
+            <button onclick="deleteRide('${ride.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-red-400 tap-scale" title="Delete entry">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function addRide(amount, note = '') {
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) return;
+
+      const newRide = {
+        id: 'ride_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        amount: numAmount,
+        note: note.trim() || (numAmount === 3.30 ? '1 Single Ride (Zone 101)' : 'Transit Ride'),
+        timestamp: Date.now()
+      };
+
+      state.rides.unshift(newRide);
+      saveToStorage();
+
+      // Feedback
+      playBeep(700, 0.08);
+      triggerHaptic('light');
+      showToast(`Added +${formatCurrency(numAmount)}!`);
+
+      // Check for break-even celebration
+      checkCelebrationMilestones();
+
+      renderDashboard();
+    }
+
+    window.deleteRide = function(id) {
+      const index = state.rides.findIndex(r => r.id === id);
+      if (index === -1) return;
+
+      lastDeletedRide = state.rides[index];
+      state.rides.splice(index, 1);
+      saveToStorage();
+
+      triggerHaptic('light');
+      showToast(`Removed entry`, '🗑️');
+      renderDashboard();
+    };
+
+    function undoLast() {
+      if (state.rides.length === 0) return;
+      lastDeletedRide = state.rides.shift();
+      saveToStorage();
+      triggerHaptic('light');
+      showToast(`Undone: ${formatCurrency(lastDeletedRide.amount)} removed`, '↩️');
+      renderDashboard();
+    }
+
+    function checkCelebrationMilestones() {
+      const m = computeMetrics();
+      if (m.total >= m.target && !state.settings.hasCelebrated100) {
+        state.settings.hasCelebrated100 = true;
+        saveToStorage();
+        triggerBreakEvenCelebration(m);
+      }
+    }
+
+    function triggerBreakEvenCelebration(metrics) {
+      triggerHaptic('celebration');
+      playBeep(880, 0.2, 'triangle');
+      setTimeout(() => playBeep(1174, 0.25, 'triangle'), 180);
+
+      // Trigger Confetti Explosion
+      try {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#10b981', '#34d399', '#6ee7b7', '#facc15', '#38bdf8']
+        });
+      } catch (e) {}
+
+      // Open Modal
+      const modal = document.getElementById('celebrationModal');
+      document.getElementById('celebrationAmount').textContent = formatCurrency(metrics.total);
+      document.getElementById('celebrationSubtext').textContent = `Your KlimaTicket has fully covered its ${formatCurrency(metrics.target)} cost! Every public transit ride from this point forward is 100% free pure profit!`;
+      modal.classList.remove('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadFromStorage();
+      renderDashboard();
+
+      // 1-Tap Primary Button (+3.30€)
+      document.getElementById('btnPrimaryAdd').addEventListener('click', () => {
+        addRide(3.30, '1 Single Ride (Zone 101)');
+      });
+
+      // Preset Fare Buttons
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const amt = btn.getAttribute('data-amount');
+          const lbl = btn.getAttribute('data-label');
+          addRide(amt, lbl);
+        });
+      });
+
+      // Quick Undo
+      document.getElementById('btnQuickUndo').addEventListener('click', undoLast);
+
+      // Clear all history
+      document.getElementById('btnClearAll').addEventListener('click', () => {
+        if (state.rides.length === 0) return;
+        if (window.confirm("Clear all logged rides? This will reset your savings counter.")) {
+          state.rides = [];
+          state.settings.hasCelebrated100 = false;
+          saveToStorage();
+          showToast('History cleared', '🧹');
+          renderDashboard();
+        }
+      });
+
+      // Custom Amount Modal Handlers
+      const customModal = document.getElementById('customModal');
+      const customPriceInput = document.getElementById('customPriceInput');
+      const customNoteInput = document.getElementById('customNoteInput');
+
+      document.getElementById('btnOpenCustomModal').addEventListener('click', () => {
+        customPriceInput.value = '';
+        customNoteInput.value = '';
+        customModal.classList.remove('hidden');
+        setTimeout(() => customPriceInput.focus(), 100);
+      });
+
+      function closeCustomModal() {
+        customModal.classList.add('hidden');
+      }
+
+      document.getElementById('btnCloseCustomModal').addEventListener('click', closeCustomModal);
+      document.getElementById('btnCancelCustom').addEventListener('click', closeCustomModal);
+
+      document.getElementById('btnSubmitCustom').addEventListener('click', () => {
+        const val = parseFloat(customPriceInput.value);
+        if (isNaN(val) || val <= 0) {
+          showToast('Please enter a valid price', '⚠️');
+          return;
+        }
+        addRide(val, customNoteInput.value);
+        closeCustomModal();
+      });
+
+      // Settings Modal Handlers
+      const settingsModal = document.getElementById('settingsModal');
+      const settingsTargetInput = document.getElementById('settingsTargetInput');
+
+      document.getElementById('btnOpenSettings').addEventListener('click', () => {
+        settingsTargetInput.value = state.settings.targetPrice;
+        settingsModal.classList.remove('hidden');
+      });
+
+      document.getElementById('btnCloseSettings').addEventListener('click', () => {
+        settingsModal.classList.add('hidden');
+      });
+
+      document.getElementById('btnSaveTarget').addEventListener('click', () => {
+        const val = parseFloat(settingsTargetInput.value);
+        if (!isNaN(val) && val > 0) {
+          state.settings.targetPrice = val;
+          // Reset celebration flag if new target is higher than current total
+          const total = state.rides.reduce((a, b) => a + Number(b.amount), 0);
+          if (total < val) {
+            state.settings.hasCelebrated100 = false;
+          }
+          saveToStorage();
+          renderDashboard();
+          showToast('Break-even goal updated!');
+          settingsModal.classList.add('hidden');
+        }
+      });
+
+      // Celebration Modal Actions
+      document.getElementById('btnCloseCelebration').addEventListener('click', () => {
+        document.getElementById('celebrationModal').classList.add('hidden');
+      });
+
+      document.getElementById('btnShareCelebration').addEventListener('click', () => {
+        const m = computeMetrics();
+        const text = `🎉 My KlimaTicket has officially paid for itself! I've saved ${formatCurrency(m.total)} in public transit rides so far! 🚊`;
+        if (navigator.share) {
+          navigator.share({ title: 'KlimaTicket Break-Even!', text, url: window.location.href }).catch(() => {});
+        } else {
+          document.execCommand('copy');
+          showToast('Milestone text copied to clipboard!');
+        }
+        document.getElementById('celebrationModal').classList.add('hidden');
+      });
+
+      // Share App Action
+      document.getElementById('btnShareApp').addEventListener('click', () => {
+        const m = computeMetrics();
+        const shareData = {
+          title: 'KlimaTracker — Transit Savings',
+          text: `Track your KlimaTicket savings easily on Android! I've saved ${formatCurrency(m.total)} so far.`,
+          url: window.location.href
+        };
+        if (navigator.share) {
+          navigator.share(shareData).catch(() => {});
+        } else {
+          // Fallback copy URL
+          const dummy = document.createElement('input');
+          document.body.appendChild(dummy);
+          dummy.value = window.location.href;
+          dummy.select();
+          document.execCommand('copy');
+          document.body.removeChild(dummy);
+          showToast('App link copied to clipboard!');
+        }
+      });
+
+      // Backup: Export JSON
+      document.getElementById('btnExportData').addEventListener('click', () => {
+        const exportObj = {
+          version: 1,
+          rides: state.rides,
+          settings: state.settings,
+          exportedAt: new Date().toISOString()
+        };
+        const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `klimatracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Backup file downloaded');
+      });
+
+      // Backup: Import JSON
+      document.getElementById('fileImportInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            if (Array.isArray(data.rides)) {
+              state.rides = data.rides;
+              if (data.settings) state.settings = { ...DEFAULT_SETTINGS, ...data.settings };
+              saveToStorage();
+              renderDashboard();
+              showToast('Data restored successfully!');
+              settingsModal.classList.add('hidden');
+            } else {
+              showToast('Invalid backup file', '⚠️');
+            }
+          } catch (err) {
+            showToast('Failed to parse JSON', '⚠️');
+          }
+        };
+        reader.readAsText(file);
+      });
+    });
+  </script>
+</body>
+</html>
